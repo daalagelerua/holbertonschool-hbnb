@@ -44,3 +44,10 @@ main {
     border: 1px solid #ddd;
     border-radius: 10px;
 }
+
+.error-message {
+    color: red;
+    font-size: 0.9rem;
+    margin-top: 10px;
+  }
+  
