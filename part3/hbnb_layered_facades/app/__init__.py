@@ -3,6 +3,7 @@ from flask import Flask
 from flask_bcrypt import Bcrypt
 from flask_jwt_extended import JWTManager
 from flask_sqlalchemy import SQLAlchemy
+from flask_cors import CORS
 
 jwt = JWTManager()
 
@@ -13,6 +14,7 @@ db = SQLAlchemy()
 
 def create_app(config_class=DevelopmentConfig):
     app = Flask(__name__)
+    CORS(app, origins=["http://localhost:5500"])
     app.config.from_object(config_class)
 
     # Makes bcrypt hashing available through app object

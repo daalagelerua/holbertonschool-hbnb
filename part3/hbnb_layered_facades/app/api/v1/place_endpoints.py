@@ -1,6 +1,7 @@
 from flask_restx import Namespace, Resource, fields
 from flask_jwt_extended import jwt_required
 from app.services import facade
+from flask_cors import cross_origin
 from app.api.v1.authentication_utils import (owner_matches_or_admin,
                                              place_owner_matches_user,
                                              admin_required)
@@ -92,6 +93,7 @@ place_light_output_model = api.model('PlaceDetailsOutput', {
 })
 
 @api.route('/')
+@cross_origin(origins="http://localhost:5500", methods=["GET", "POST", "OPTIONS"])
 class PlaceList(Resource):
     @place_owner_matches_user
     @api.expect(place_input_model, validate=True)

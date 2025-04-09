@@ -3,5 +3,6 @@ flask-restx
 flask-bcrypt
 flask-jwt-extended
 flask-sqlalchemy
+flask-cors
 email_validator
 sqlalchemy
