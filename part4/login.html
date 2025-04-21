@@ -3,23 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login</title>
+    <title>Login - HBnB</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
 </head>
 <body>
+    <header>
+        <div>
+            <a href="index.html">
+                <img class="logo" src="./images/logo.png" alt="hbnb logo">
+            </a>
+        </div>
+        <nav>
+            <a href="index.html" class="nav-link">
+                <i class="fas fa-home"></i> Home
+            </a>
+        </nav>
+    </header>
     <main>
         <form id="login-form">
-            <h2>Login</h2>
-            <label for="email">Email:</label>
-            <input type="email" id="email" name="email" required>
+            <h2><i class="fas fa-user-circle"></i> Login to HBnB</h2>
             
-            <label for="password">Password:</label>
-            <input type="password" id="password" name="password" required>
+            <div class="form-group">
+                <label for="email"><i class="fas fa-envelope"></i> Email:</label>
+                <input type="email" id="email" name="email" placeholder="Enter your email" required>
+            </div>
             
-            <button class="submit-button" type="submit">Login</button>
+            <div class="form-group">
+                <label for="password"><i class="fas fa-lock"></i> Password:</label>
+                <input type="password" id="password" name="password" placeholder="Enter your password" required>
+            </div>
+            
+            <div id="login-error" class="error-message" style="display: none;"></div>
+            
+            <button class="submit-button" type="submit">
+                <i class="fas fa-sign-in-alt"></i> Login
+            </button>
+            
+            <p class="login-help">
+                Don't have an account? Contact your administrator.
+            </p>
         </form>
-        <p id="login-error" class="error-message"></p>
     </main>
+    <footer>
+        <p>&copy; 2025 HBnB Evolution. All rights reserved.</p>
+    </footer>
     <script src="scripts.js"></script>
 </body>
 </html>

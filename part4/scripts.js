@@ -1,119 +1,70 @@
 document.addEventListener('DOMContentLoaded', () => {
-  console.log("Page loaded, checking authentication"); // Debug
+  console.log("Page loaded, checking authentication");
   checkAuthentication();
   setupPriceFilter();
   fetchPlaces();
   loadPriceFilterOptions();
 
-  // when click on button 'view details'
-  const detailButtons = document.querySelectorAll('.details-button');
-
-  detailButtons.forEach(button => {
-    button.addEventListener('click', function () {
-      const placeId = button.getAttribute('data-id');
-      if (placeId) {
-        // complete URL = place.html + place_id
-        window.location.href = `place.html?id=${placeId}`;
-      }
-    });
-  });
-
-  // Login form
+  // Setup login form
   const loginForm = document.getElementById('login-form');
-
   if (loginForm) {
     loginForm.addEventListener('submit', async (event) => {
-      event.preventDefault(); // 🛑 stop the page from reloading
-
+      event.preventDefault();
       const email = document.getElementById('email').value;
       const password = document.getElementById('password').value;
-
       await loginUser(email, password);
     });
   }
-
-    // Adding price filter options
-    const priceFilter = document.getElementById('price-filter');
-    if (priceFilter) {
-      const priceOptions = [10, 50, 100, 'All'];
-      priceOptions.forEach(optionValue => {
-        const option = document.createElement('option');
-        option.value = optionValue;
-        option.textContent = optionValue;
-        priceFilter.appendChild(option);
-      });
-  
-      // Listening to changes in places
-      priceFilter.addEventListener('change', (event) => {
-        const selectedPrice = event.target.value;
-        const allPlaces = document.querySelectorAll('.place-card');
-  
-        allPlaces.forEach(place => {
-          const priceText = place.querySelector('p').textContent;
-          const match = priceText.match(/€(\d+)/);
-          const price = match ? parseInt(match[1], 10) : 0;
-  
-          if (selectedPrice === 'All' || price <= parseInt(selectedPrice)) {
-            place.style.display = 'block';
-          } else {
-            place.style.display = 'none';
-          }
-        });
-      });
-    }
 });
 
 async function loginUser(email, password) {
   const errorMessage = document.getElementById('login-error');
+  if (errorMessage) errorMessage.style.display = 'none';
 
   try {
     const response = await fetch('http://127.0.0.1:5000/api/v1/login', {
-      method: 'POST', // sending POST request (to send data)
+      method: 'POST',
       headers: {
-        'Content-Type': 'application/json' // data we wish to send are JSON
+        'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ email, password }) // convert data to json string
+      body: JSON.stringify({ email, password })
     });
 
     if (response.ok) {
-      const data = await response.json(); // retrieve data in format json (JWT)
-
-      // store token in a cookie 🍪
+      const data = await response.json();
       document.cookie = `token=${data.access_token}; path=/`;
-
-      // redirect to index.html
-      window.location.href = 'index.html';
+      
+      // Check if there's a redirect parameter
+      const urlParams = new URLSearchParams(window.location.search);
+      const redirectUrl = urlParams.get('redirect');
+      
+      if (redirectUrl) {
+        window.location.href = redirectUrl;
+      } else {
+        window.location.href = 'index.html';
+      }
     } else {
-      const errorData = await response.json(); // retrieve error message
+      const errorData = await response.json();
       const errorElement = document.getElementById('login-error');
       if (errorElement) {
-        errorElement.textContent = errorData.error || 'Incorrect IDs';
+        errorElement.textContent = errorData.error || 'Invalid credentials';
         errorElement.style.display = 'block';
       }
     }
-    // if error during fetch
   } catch (error) {
-    console.error('Erreur de connexion :', error);
-    alert('Erreur server ou reseau');
+    console.error('Connection error:', error);
+    const errorElement = document.getElementById('login-error');
+    if (errorElement) {
+      errorElement.textContent = 'Server or network error';
+      errorElement.style.display = 'block';
+    }
   }
 }
 
-// Gestionnaire de soumission du formulaire de connexion
-if (document.getElementById('login-form')) {
-  document.getElementById('login-form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    loginUser(email, password);
-  });
-}
-
-// extract value of a cookie (here the token)
 function getCookie(name) {
   const cookies = document.cookie.split(';');
   for (let i = 0; i < cookies.length; i++) {
     const cookie = cookies[i].trim();
-    // check if cookie start with "name="
     if (cookie.startsWith(name + '=')) {
       return cookie.substring(name.length + 1);
     }
@@ -121,44 +72,73 @@ function getCookie(name) {
   return null;
 }
 
-
-// control login display
 function checkAuthentication() {
   const token = getCookie('token');
+  console.log("Checking authentication, token:", token ? "Token exists" : "No token");
 
-  // interface element to update
   const loginLink = document.getElementById('login-link');
   const logoutLink = document.getElementById('logout-link');
 
-  console.log("Checking authentication, token:", token); // Debug
-
   if (token) {
-    // L'utilisateur est authentifié
-    console.log("User is logged in"); // Debug
-
-    if (loginLink) loginLink.style.display = 'none';
-    if (logoutLink) logoutLink.style.display = 'block';
-    return token;
-      
-      // Ajouter l'événement de déconnexion
-      //logoutLink.onclick = function(e) {
-      //  e.preventDefault();
-      //  document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
-      //  window.location.reload();
-     // };
-   // }
+    console.log("User is logged in");
     
-    // Load data that need auth
-    //fetchPlaces(token);
+    // Verify if token is valid by checking its expiration
+    try {
+      const tokenData = parseJwt(token);
+      const currentTime = Math.floor(Date.now() / 1000);
+      
+      if (tokenData.exp && tokenData.exp < currentTime) {
+        console.log("Token expired, logging out");
+        clearAuthToken();
+        if (loginLink) loginLink.style.display = 'block';
+        if (logoutLink) logoutLink.style.display = 'none';
+        return null;
+      }
+    } catch (e) {
+      console.error("Error parsing token:", e);
+      // If token can't be parsed, clear it
+      clearAuthToken();
+      if (loginLink) loginLink.style.display = 'block';
+      if (logoutLink) logoutLink.style.display = 'none';
+      return null;
+    }
+    
+    // Token is valid
+    if (loginLink) loginLink.style.display = 'none';
+    if (logoutLink) {
+      logoutLink.style.display = 'block';
+      logoutLink.onclick = function(e) {
+        e.preventDefault();
+        clearAuthToken();
+        window.location.reload();
+      };
+    }
+    return token;
   } else {
-    // User not auth
     if (loginLink) loginLink.style.display = 'block';
     if (logoutLink) logoutLink.style.display = 'none';
     return null;
   }
 }
 
+function clearAuthToken() {
+  document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+}
 
+// Parse JWT token to check expiration
+function parseJwt(token) {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    console.error('Error parsing JWT:', e);
+    return {};
+  }
+}
 
 async function fetchPlaces() {
   try {
@@ -167,45 +147,56 @@ async function fetchPlaces() {
       "Content-Type": "application/json"
     };
     
-    // Add a token if it exist
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
     }
 
+    console.log("Fetching places...");
     const response = await fetch("http://127.0.0.1:5000/api/v1/places/", {
       method: "GET",
       headers: headers
     });
 
+    console.log("Response status:", response.status);
+
     if (!response.ok) {
       console.warn(`Server responded with ${response.status}`);
 
-      if (response.status === 401 && !token) {
-        const placesListElement = document.getElementById('places-list');
-        if (placesListElement) {
-          placesListElement.innerHTML = `
-            <div class="notice-container">
-              <p>You need to connect to see the list of places.</p>
-              <a href="login.html" class="login-button">Login</a>
-            </div>
-          `;
+      if (response.status === 401) {
+        if (token) {
+          // Token might be expired
+          console.log("Authentication error, clearing token");
+          clearAuthToken();
+          window.location.reload();
+          return;
+        } else {
+          const placesListElement = document.getElementById('places-list');
+          if (placesListElement) {
+            placesListElement.innerHTML = `
+              <div class="notice-container">
+                <p>You need to login to see the list of places.</p>
+                <a href="login.html" class="login-button">Login</a>
+              </div>
+            `;
+          }
+          return;
         }
-        return;
       }
       
-      throw new Error(`error while retrieving places: ${response.status}`);
+      throw new Error(`Error retrieving places: ${response.status}`);
     }
 
     const places = await response.json();
+    console.log("Places data received:", places.length, "places");
     displayPlaces(places);
   } catch (error) {
-    console.error("Error while retrieving places :", error);
+    console.error("Error retrieving places:", error);
     const placesListElement = document.getElementById('places-list');
     if (placesListElement) {
       placesListElement.innerHTML = `
         <div class="error-container">
           <p>Cannot fetch list of places.</p>
-          <p>Erreur: ${error.message}</p>
+          <p>Error: ${error.message}</p>
         </div>
       `;
     }
@@ -214,31 +205,71 @@ async function fetchPlaces() {
 
 function displayPlaces(places) {
   const placesList = document.getElementById('places-list');
+  const loadingIndicator = document.getElementById('loading-indicator');
+  
+  if (loadingIndicator) {
+    loadingIndicator.style.display = 'none';
+  }
+  
   if (!placesList) return;
 
-  // Clear last results
+  console.log("Displaying places:", places); // Debug
+
+  console.log("Raw place objects:", places);
+  places.forEach(place => {
+    console.log(`Place ${place.id} - description:`, place.description);
+  });
+
+  // Clear previous content
   placesList.innerHTML = '';
 
-  places.forEach(place => {
+  if (!places || places.length === 0) {
+    placesList.innerHTML = '<div class="notice-container"><p>No places available at the moment.</p></div>';
+    return;
+  }
+
+  places.forEach((place, index) => {
     const placeCard = document.createElement('div');
     placeCard.className = 'place-card';
-    placeCard.setAttribute('data-price', place.price); // useful for filter
+    placeCard.setAttribute('data-price', place.price || 0);
 
+    // Check if all required properties exist
+    const title = place.title || 'Unnamed place';
+    const description = place.description || 'No description available';
+    const price = typeof place.price === 'number' ? `$${place.price}` : 'Price not available';
+    const placeId = place.id;
+
+    if (!placeId) {
+      console.warn('Place without ID:', place);
+      return; // Skip places without ID
+    }
+    
+    // Create a generic colored background instead of using an image placeholder
+    const colors = ['#FFD1DC', '#B5EAD7', '#C7CEEA', '#F8B195', '#FFDAC1'];
+    const bgColor = colors[index % colors.length];
+    
     placeCard.innerHTML = `
-      <h2>${place.title}</h2>
-      <p>${place.description ? place.description : 'No description available'}</p>
-      <p>Price per night: €${place.price}</p>
-      <button class="details-button" data-id="${place.id}">View Details</button>
+      <div class="place-image" style="background-color: ${bgColor}; display: flex; align-items: center; justify-content: center;">
+        <i class="fas fa-home" style="font-size: 48px; color: white;"></i>
+      </div>
+      <div class="place-content">
+        <h2 title="${title}">${title}</h2>
+        <p class="place-description">${description}</p>
+        <p class="place-price"><i class="fas fa-tag"></i> ${price} per night</p>
+        <button class="details-button" data-id="${placeId}">
+          <i class="fas fa-info-circle"></i> View Details
+        </button>
+      </div>
     `;
 
     placesList.appendChild(placeCard);
   });
 
-  // Réattacher les events "View Details" après avoir créé dynamiquement les boutons
+  // Add event listeners to details buttons
   const detailButtons = document.querySelectorAll('.details-button');
   detailButtons.forEach(button => {
-    button.addEventListener('click', function () {
-      const placeId = button.getAttribute('data-id');
+    button.addEventListener('click', function() {
+      const placeId = this.getAttribute('data-id');
       if (placeId) {
         window.location.href = `place.html?id=${placeId}`;
       }
@@ -246,16 +277,14 @@ function displayPlaces(places) {
   });
 }
 
-// Fonction pour charger les options du filtre de prix
 function loadPriceFilterOptions() {
   const priceFilter = document.getElementById('price-filter');
   if (priceFilter && priceFilter.options.length === 0) {
-
     const options = [
-      { value: '10', text: '10' },
-      { value: '50', text: '50' },
-      { value: '100', text: '100' },
-      { value: 'All', text: 'All' }
+      { value: '50', text: 'Up to $50' },
+      { value: '100', text: 'Up to $100' },
+      { value: '200', text: 'Up to $200' },
+      { value: 'All', text: 'All Prices' }
     ];
     
     options.forEach(option => {
@@ -267,27 +296,20 @@ function loadPriceFilterOptions() {
   }
 }
 
-// Fonction pour filtrer les logements par prix
 function filterPlacesByPrice(maxPrice) {
-  console.log("Filtering by price:", maxPrice);
-
   const placeCards = document.querySelectorAll('.place-card');
   
   placeCards.forEach(card => {
-    // Récupérer le prix à partir de l'attribut data-price
     const price = parseFloat(card.getAttribute('data-price') || 0);
     
     if (maxPrice === 'All' || price <= parseFloat(maxPrice)) {
-      // Montrer le logement
       card.style.display = 'block';
     } else {
-      // Cacher le logement
       card.style.display = 'none';
     }
   });
 }
 
-// Add eventListener to price filter
 function setupPriceFilter() {
   const priceFilter = document.getElementById('price-filter');
   
